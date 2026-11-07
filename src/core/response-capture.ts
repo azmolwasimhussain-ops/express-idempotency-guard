@@ -23,14 +23,9 @@ export function captureBufferedResponse(res: Response, maxBytes: number): Respon
   const originalEnd = res.end;
   res.end = ((...args: unknown[]) => {
     if (supported) {
-      const chunk = toBytes(args[0], args[1]);
-      if (!chunk) {
-        supported = false;
-      } else if (chunk.byteLength > maxBytes) {
-        supported = false;
-      } else {
-        body = chunk;
-      }
+      const chunk = toBytes(args[0], args[1], maxBytes);
+      if (!chunk) supported = false;
+      else body = chunk;
     }
     return Reflect.apply(originalEnd, res, args);
   }) as typeof res.end;
@@ -71,12 +66,16 @@ export function snapshotResponse(
   };
 }
 
-function toBytes(chunk: unknown, encoding: unknown): Uint8Array | undefined {
+function toBytes(chunk: unknown, encoding: unknown, maxBytes: number): Uint8Array | undefined {
   if (chunk === undefined || chunk === null) return new Uint8Array();
   if (typeof chunk === "string") {
     const validEncoding = typeof encoding === "string" ? (encoding as BufferEncoding) : "utf8";
+    if (Buffer.byteLength(chunk, validEncoding) > maxBytes) return undefined;
     return Buffer.from(chunk, validEncoding);
   }
-  if (chunk instanceof Uint8Array) return new Uint8Array(chunk);
+  if (chunk instanceof Uint8Array) {
+    if (chunk.byteLength > maxBytes) return undefined;
+    return new Uint8Array(chunk);
+  }
   return undefined;
 }
