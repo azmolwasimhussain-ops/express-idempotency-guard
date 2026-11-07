@@ -57,9 +57,11 @@
     "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "pack": "npm pack --ignore-scripts",
     "pack:check": "npm pack --dry-run"
   },
   "devDependencies": {

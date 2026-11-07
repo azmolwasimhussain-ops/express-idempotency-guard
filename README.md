@@ -292,9 +292,11 @@ Fingerprinting serializes the parsed body and hashes the resulting bytes. Keep p
 ```sh
 npm install
 npm run lint
+npm run format
 npm run typecheck
 npm test
 npm run build
+npm run pack
 npm run pack:check
 ```
 
