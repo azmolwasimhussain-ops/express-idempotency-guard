@@ -1,5 +1,5 @@
 import express from "express";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { idempotencyGuard } from "express-idempotency-guard";
 
 const app = express();
@@ -11,7 +11,27 @@ app.use((req, _res, next) => {
   next();
 });
 
-const payments = new Map();
+// Demo stand-in for a payment provider that stores results by idempotency key.
+const providerResults = new Map();
+const paymentProvider = {
+  async create(input, { idempotencyKey }) {
+    const existing = providerResults.get(idempotencyKey);
+    if (existing) return existing;
+
+    const payment = {
+      id: `payment_${randomUUID()}`,
+      amount: input.amount,
+      currency: input.currency,
+      status: "created"
+    };
+    providerResults.set(idempotencyKey, payment);
+    return payment;
+  }
+};
+
+function providerKeyFor(userId, clientKey) {
+  return createHash("sha256").update(`${userId}\0${clientKey}`).digest("hex");
+}
 
 app.post(
   "/payments",
@@ -20,15 +40,15 @@ app.post(
     methods: ["POST"],
     keyScope: (req) => req.user.id
   }),
-  (req, res) => {
-    const payment = {
-      id: `payment_${randomUUID()}`,
-      amount: req.body.amount,
-      currency: req.body.currency,
-      status: "created"
-    };
-    payments.set(payment.id, payment);
-    res.status(201).json(payment);
+  async (req, res, next) => {
+    try {
+      const payment = await paymentProvider.create(req.body, {
+        idempotencyKey: providerKeyFor(req.user.id, req.get("Idempotency-Key"))
+      });
+      res.status(201).json(payment);
+    } catch (error) {
+      next(error);
+    }
   }
 );
 
