@@ -20,6 +20,20 @@ describe("request fingerprints", () => {
     expect(canonicalize({ z: 1, a: { y: 2, x: 3 }, list: [2, 1] })).toBe(
       '{"a":{"x":3,"y":2},"list":[2,1],"z":1}'
     );
+    expect(canonicalize(["first", "second"])).not.toBe(canonicalize(["second", "first"]));
+  });
+
+  it("normalizes dates, byte arrays, non-finite numbers, and undefined object values", () => {
+    const value = {
+      bytes: new Uint8Array([0, 255]),
+      date: new Date("2026-11-07T12:00:00.000Z"),
+      omitted: undefined,
+      values: [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]
+    };
+
+    expect(canonicalize(value)).toBe(
+      '{"bytes":{"$bytes":"AP8="},"date":"2026-11-07T12:00:00.000Z","values":[null,null,null]}'
+    );
   });
 
   it("matches retries whose JSON object keys are in a different order", async () => {
