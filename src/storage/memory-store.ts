@@ -117,8 +117,7 @@ export class MemoryStore implements IdempotencyStore {
     };
     const currentSize = this.entrySizes.get(key) ?? 0;
     if (this.storedBytes - currentSize + estimateEntryBytes(completed) > this.maxBytes) {
-      this.removeEntry(key);
-      return false;
+      throw new StoreCapacityError();
     }
     this.writeEntry(key, completed);
     return true;

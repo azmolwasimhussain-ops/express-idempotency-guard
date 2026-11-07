@@ -85,6 +85,38 @@ describe("idempotencyGuard", () => {
     expect(calls).toBe(0);
   });
 
+  it("keeps the reservation when a successful response cannot fit store capacity", async () => {
+    let calls = 0;
+    const errors: string[] = [];
+    const app = appWith(
+      idempotencyGuard({
+        storage: memoryStore({ maxBytes: 230 }),
+        inProgressWaitMs: 0,
+        onError: (error, _req, res) => {
+          errors.push(error.code);
+          if (!res.headersSent) res.status(error.statusCode).json({ code: error.code });
+        }
+      }),
+      (_req, res) => res.status(201).json({ call: ++calls })
+    );
+
+    const first = await request(app)
+      .post("/operations")
+      .set("Idempotency-Key", "completion-capacity")
+      .send({});
+    await new Promise((resolve) => setImmediate(resolve));
+    const retry = await request(app)
+      .post("/operations")
+      .set("Idempotency-Key", "completion-capacity")
+      .send({});
+
+    expect(first.status).toBe(201);
+    expect(retry.status).toBe(409);
+    expect(retry.body.code).toBe("REQUEST_IN_PROGRESS");
+    expect(errors).toEqual(["STORE_CAPACITY", "REQUEST_IN_PROGRESS"]);
+    expect(calls).toBe(1);
+  });
+
   it("rejects an invalid overlong key", async () => {
     const app = appWith(
       idempotencyGuard({ storage: memoryStore(), maxKeyLength: 5 }),

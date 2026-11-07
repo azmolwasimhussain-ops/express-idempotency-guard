@@ -140,4 +140,31 @@ describe("MemoryStore", () => {
     expect(store.size).toBe(0);
     expect(store.sizeInBytes).toBe(0);
   });
+
+  it("retains a pending reservation when the completed response exceeds store capacity", async () => {
+    const store = createStore({ maxBytes: 180 });
+    const reservation = pending("owner");
+    await store.reserve("key", reservation, 1000);
+    const completed: CompletedEntry = {
+      state: "complete",
+      fingerprint: reservation.fingerprint,
+      reservationId: reservation.reservationId,
+      expiresAt: Date.now() + 1000,
+      response: {
+        statusCode: 201,
+        headers: { "content-type": "application/json" },
+        body: new Uint8Array(64)
+      }
+    };
+
+    await expect(store.set("key", completed, 1000, "owner")).rejects.toThrow(/capacity/);
+    await expect(store.get("key")).resolves.toMatchObject({
+      state: "pending",
+      reservationId: "owner"
+    });
+    await expect(store.reserve("key", pending("retry"), 1000)).resolves.toMatchObject({
+      acquired: false,
+      entry: { state: "pending", reservationId: "owner" }
+    });
+  });
 });
