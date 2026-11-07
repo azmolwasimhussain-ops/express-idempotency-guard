@@ -65,6 +65,26 @@ describe("idempotencyGuard", () => {
     });
   });
 
+  it("fails closed with 503 when the memory store is over capacity", async () => {
+    let calls = 0;
+    const app = appWith(
+      idempotencyGuard({ storage: memoryStore({ maxBytes: 1 }) }),
+      (_req, res) => {
+        calls += 1;
+        res.json({ ok: true });
+      }
+    );
+
+    const response = await request(app)
+      .post("/operations")
+      .set("Idempotency-Key", "capacity-key")
+      .send({});
+
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe("STORE_CAPACITY");
+    expect(calls).toBe(0);
+  });
+
   it("rejects an invalid overlong key", async () => {
     const app = appWith(
       idempotencyGuard({ storage: memoryStore(), maxKeyLength: 5 }),
