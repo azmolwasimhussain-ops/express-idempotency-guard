@@ -83,16 +83,48 @@ describe("MemoryStore", () => {
     expect(saved.response.headers.vary).toEqual(["accept"]);
   });
 
-  it("expires records and prunes stale entries", async () => {
+  it("prunes expired records and updates stored-byte accounting", async () => {
+    vi.useFakeTimers();
+    const store = createStore({ cleanupIntervalMs: 60_000 });
+    await store.reserve("key", pending("owner"), 50);
+    expect(store.sizeInBytes).toBeGreaterThan(0);
+
+    await vi.advanceTimersByTimeAsync(51);
+
+    expect(store.pruneExpired()).toBe(1);
+    expect(store.size).toBe(0);
+    expect(store.sizeInBytes).toBe(0);
+  });
+
+  it("sweeps expired records on the background cleanup interval", async () => {
     vi.useFakeTimers();
     const store = createStore({ cleanupIntervalMs: 10 });
     await store.reserve("key", pending("owner"), 50);
 
     await vi.advanceTimersByTimeAsync(51);
 
-    expect(await store.get("key")).toBeUndefined();
-    expect(store.pruneExpired()).toBe(0);
     expect(store.size).toBe(0);
+    expect(store.sizeInBytes).toBe(0);
+  });
+
+  it("allows a new reservation after expiry without accepting the old owner's write", async () => {
+    vi.useFakeTimers();
+    const store = createStore();
+    await store.reserve("key", pending("old-owner"), 10);
+
+    await vi.advanceTimersByTimeAsync(11);
+
+    expect(await store.reserve("key", pending("new-owner"), 1000)).toEqual({ acquired: true });
+    const staleCompletion: CompletedEntry = {
+      state: "complete",
+      fingerprint: "fingerprint",
+      reservationId: "old-owner",
+      expiresAt: Date.now() + 1000,
+      response: { statusCode: 200, headers: {}, body: new Uint8Array() }
+    };
+
+    expect(await store.set("key", staleCompletion, 1000, "old-owner")).toBe(false);
+    expect(await store.get("key")).toMatchObject({ state: "pending", reservationId: "new-owner" });
   });
 
   it("fails closed when its configured capacity is full", async () => {
