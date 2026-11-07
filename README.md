@@ -195,6 +195,17 @@ interface IdempotencyGuardOptions {
 | `skip`                 | —                                                                               | Return true to bypass this middleware for a selected request.                                                            |
 | `onError`              | Built-in JSON response                                                          | Override how middleware errors are handled. It also receives storage failures after the original response has been sent. |
 
+### Configuration validation
+
+Invalid static options throw a `TypeError` when `idempotencyGuard()` is created:
+
+- `ttl` and `pollIntervalMs` must be positive finite numbers; `inProgressWaitMs` must be finite and non-negative.
+- `maxKeyLength`, `maxFingerprintBytes`, and `maxResponseBytes` must be positive safe integers.
+- `methods` must contain one or more valid HTTP method tokens. `statusCodesToCache` values must be integers from `200` to `599`, and `inProgressStatusCode` must be from `400` to `599`.
+- `headerName` and each `responseHeaders` entry must be valid HTTP header names. Unsafe response headers such as `set-cookie`, `content-length`, and hop-by-hop headers are rejected.
+
+At request time, keys must contain 1 to `maxKeyLength` visible ASCII characters. A `keyScope` callback and a custom `fingerprint` callback must each return a string.
+
 `keyScope` should use a trusted identity established before this middleware. Without a scope, callers who share a key and identical request across users share a deduplication record. Do not derive scope from an untrusted header.
 
 The default fingerprint sorts object keys and includes the method, matched route, original URL, content type, and request body. Install a body parser before the guard. The application remains responsible for limiting the body size at the parser.
