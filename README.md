@@ -32,7 +32,7 @@ The key identifies one logical operation. A client should generate it once and r
 
 ## Installation
 
-Install the package with:
+Once version `1.0.0` is available on npm, install it with:
 
 ```sh
 npm install express-idempotency-guard express
