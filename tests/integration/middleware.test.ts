@@ -423,6 +423,32 @@ describe("idempotencyGuard", () => {
     expect(calls).toBe(2);
   });
 
+  it("delivers oversized responses without caching them", async () => {
+    let calls = 0;
+    const app = appWith(
+      idempotencyGuard({ storage: memoryStore(), maxResponseBytes: 4 }),
+      (_req, res) => {
+        calls += 1;
+        res.status(201).type("text").send(`response-${calls}`);
+      }
+    );
+
+    const first = await request(app)
+      .post("/operations")
+      .set("Idempotency-Key", "oversized-key")
+      .send({});
+    const second = await request(app)
+      .post("/operations")
+      .set("Idempotency-Key", "oversized-key")
+      .send({});
+
+    expect(first.status).toBe(201);
+    expect(first.text).toBe("response-1");
+    expect(second.text).toBe("response-2");
+    expect(second.headers["idempotency-replayed"]).toBe("false");
+    expect(calls).toBe(2);
+  });
+
   it("supports custom storage adapters", async () => {
     const backing = memoryStore();
     const storage: IdempotencyStore = {
