@@ -36,6 +36,13 @@ describe("request fingerprints", () => {
     );
   });
 
+  it("preserves prototype-named JSON properties during canonicalization", () => {
+    const body = JSON.parse('{"__proto__":{"role":"admin"}}') as Record<string, unknown>;
+
+    expect(canonicalize(body)).toBe('{"__proto__":{"role":"admin"}}');
+    expect(canonicalize(body)).not.toBe(canonicalize({}));
+  });
+
   it("matches retries whose JSON object keys are in a different order", async () => {
     const one = await createRequestFingerprint(request(), { maxBytes: 1024 });
     const two = await createRequestFingerprint(

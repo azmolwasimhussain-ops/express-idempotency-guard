@@ -116,6 +116,28 @@ describe("idempotencyGuard", () => {
     expect(calls).toBe(1);
   });
 
+  it("rejects key reuse when JSON payloads differ only by a prototype-named property", async () => {
+    let calls = 0;
+    const app = appWith(idempotencyGuard({ storage: memoryStore() }), (req, res) => {
+      calls += 1;
+      res.json({ calls, body: req.body });
+    });
+    const first = await request(app)
+      .post("/operations")
+      .set("Idempotency-Key", "prototype-key")
+      .set("Content-Type", "application/json")
+      .send('{"__proto__":{"role":"admin"}}');
+    const different = await request(app)
+      .post("/operations")
+      .set("Idempotency-Key", "prototype-key")
+      .send({});
+
+    expect(first.status).toBe(200);
+    expect(different.status).toBe(409);
+    expect(different.body.error.code).toBe("KEY_REUSED");
+    expect(calls).toBe(1);
+  });
+
   it("fingerprints the HTTP method so reuse on another method conflicts", async () => {
     let calls = 0;
     const guard = idempotencyGuard({ storage: memoryStore() });

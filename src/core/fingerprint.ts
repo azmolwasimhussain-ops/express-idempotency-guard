@@ -74,7 +74,7 @@ function sortValue(value: unknown): unknown {
 
   if (value instanceof Date) return value.toISOString();
 
-  const sorted: Record<string, unknown> = {};
+  const sorted: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   for (const key of Object.keys(value).sort()) {
     const item = (value as Record<string, unknown>)[key];
     if (item !== undefined) sorted[key] = sortValue(item);
