@@ -1,14 +1,14 @@
 # express-idempotency-guard
 
-**One request. One operation. No accidental duplicates.**
+**Safer retries for Express APIs.**
 
-`express-idempotency-guard` is Express middleware for making retryable API operations safer. It uses an `Idempotency-Key` header, a request fingerprint, an atomic storage reservation, and a bounded response cache to prevent duplicate handlers from running for the same operation.
+`express-idempotency-guard` tracks requests by an `Idempotency-Key`. It fingerprints each request and reserves its key in the configured store. Matching retries wait for an in-flight request or replay an eligible saved response; requests that reuse a key with a different fingerprint receive `409 Conflict`.
 
 **Repository:** [azmolwasimhussain-ops/express-idempotency-guard](https://github.com/azmolwasimhussain-ops/express-idempotency-guard) · [Issues](https://github.com/azmolwasimhussain-ops/express-idempotency-guard/issues) · [Security policy](https://github.com/azmolwasimhussain-ops/express-idempotency-guard/blob/main/SECURITY.md)
 
 ## Why this package exists
 
-Clients retry when a connection fails or a response is lost. The server may already have completed the operation, so running the handler again can create a second order, payment, or other side effect. This middleware records the first operation and replays its buffered response to a matching retry.
+Clients retry when a connection fails or a response is lost. The server may already have completed the operation, so running the handler again can create a second order, payment, or other side effect. This middleware reserves the key while the first request runs and saves eligible buffered responses for matching retries.
 
 The key identifies one logical operation. A client should generate it once and reuse it for retries of that operation. A new key on every attempt defeats deduplication.
 
@@ -32,9 +32,13 @@ The key identifies one logical operation. A client should generate it once and r
 
 ## Installation
 
+This project is not currently published to npm. Once it is published, install it with:
+
 ```sh
 npm install express-idempotency-guard express
 ```
+
+To try an unpublished checkout, run `npm run pack` in the repository and install the generated tarball from your application.
 
 The package does not bundle Express. Install Express in your application.
 
@@ -48,16 +52,12 @@ const app = express();
 
 app.use(express.json());
 
-app.post(
-  "/payments",
-  idempotencyGuard({
-    ttl: 24 * 60 * 60 * 1000,
-    methods: ["POST", "PATCH"]
-  }),
-  async (req, res) => {
-    const payment = await createPayment(req.body);
-    res.status(201).json(payment);
-  }
+app.post("/payments", idempotencyGuard(), (req, res) =>
+  res.status(201).json({
+    paymentId: "payment_123",
+    amount: req.body.amount,
+    currency: req.body.currency
+  })
 );
 
 app.listen(3000);
@@ -73,6 +73,8 @@ curl -X POST http://localhost:3000/payments \
 ```
 
 The first response includes `Idempotency-Replayed: false`; a replay includes `Idempotency-Replayed: true`.
+
+This route returns a sample response; replace it with your application's payment operation.
 
 ## JavaScript CommonJS
 
@@ -129,7 +131,11 @@ The `req.user` type in this example is supplied by the application's authenticat
 
 ## Payment API example
 
-```ts
+When a provider shares idempotency keys across customers, derive its key from both the authenticated identity and the client key. The runnable example uses this approach.
+
+```js
+import { createHash } from "node:crypto";
+
 app.post(
   "/payments",
   authenticate,
@@ -138,11 +144,18 @@ app.post(
     ttl: 24 * 60 * 60 * 1000,
     keyScope: (req) => req.user.id
   }),
-  async (req, res) => {
-    const payment = await paymentProvider.create(req.body, {
-      idempotencyKey: req.get("Idempotency-Key")
-    });
-    res.status(201).json(payment);
+  async (req, res, next) => {
+    try {
+      const providerKey = createHash("sha256")
+        .update(`${req.user.id}\0${req.get("Idempotency-Key")}`)
+        .digest("hex");
+      const payment = await paymentProvider.create(req.body, {
+        idempotencyKey: providerKey
+      });
+      res.status(201).json(payment);
+    } catch (error) {
+      next(error);
+    }
   }
 );
 ```
