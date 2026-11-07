@@ -1,0 +1,19 @@
+name: Feature request
+description: Propose a focused improvement to the package.
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the behavior and any compatibility considerations.
+    validations:
+      required: true
