@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 - 2026-11-07
+## 1.0.0 - 2026-11-08
 
 - Add Express idempotency middleware with configurable methods, keys, fingerprints, TTL, and errors.
 - Add bounded in-memory storage with atomic reservations, expiration, and safe response cloning.

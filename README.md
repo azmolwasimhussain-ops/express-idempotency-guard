@@ -32,13 +32,13 @@ The key identifies one logical operation. A client should generate it once and r
 
 ## Installation
 
-This project is not currently published to npm. Once it is published, install it with:
+Install the package with:
 
 ```sh
 npm install express-idempotency-guard express
 ```
 
-To try an unpublished checkout, run `npm run pack` in the repository and install the generated tarball from your application.
+To test a local checkout, run `npm run pack` in the repository and install the generated tarball from your application.
 
 The package does not bundle Express. Install Express in your application.
 
